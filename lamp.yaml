@@ -1,0 +1,289 @@
+esphome:
+  name: lamp
+  platform: ESP8266
+  board: nodemcuv2
+  on_boot:
+    priority: -10
+    then:
+      - output.turn_off: buzzer_1
+      - light.turn_off: light_1
+
+wifi:
+  ssid: "d-diot"
+  password: "d-diot.com"
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+
+sensor:
+# Wifi signal monitor
+  - platform: wifi_signal
+    name: "WiFi Signal Sensor"
+    update_interval: 60s
+# Microphone (Analog output)
+#  - platform: adc
+#    pin: A0
+#    name: "Noise level"
+#    unit_of_measurement: "%"
+#    accuracy_decimals: 0
+#    update_interval: 60s
+#    filters:
+#      - multiply: 100
+# Photoresitor (Analog output)
+  - platform: adc
+    pin: A0
+    name: "Light level"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: 60s
+    filters:
+      - multiply: 100   
+   
+    
+# Power supply PIN to activate the led strip
+power_supply:
+  - id: 'power_supply_1'
+    pin: D1
+    
+    
+    
+# Buzzer    
+output:
+  - platform: esp8266_pwm
+    pin: D6
+    id: "buzzer_1"
+    
+
+
+binary_sensor:
+# Microphone (Digital output)
+#  - platform: gpio
+#    pin: D7
+#    name: "Mic"
+#    device_class: sound
+# Button
+  - platform: gpio
+    pin: D5
+    name: "Button"
+    id: "button_1"
+    on_press:
+      - output.esp8266_pwm.set_frequency:
+            id: buzzer_1
+            frequency: 1000Hz
+      - output.set_level:
+            id: buzzer_1
+            level: 50%
+    on_release:
+      - output.turn_off: buzzer_1
+    on_multi_click:
+  # Single click - Toggle ON/OFF
+    - timing:
+        - ON for at most 0.6s
+        - OFF for at least 0.4s
+      then:
+        - light.toggle: light_1
+  # Single long press: Brightness +  
+    - timing:
+        - ON for at least 0.6s
+        - OFF for at least 0.2s
+      then:
+        - output.esp8266_pwm.set_frequency:
+            id: buzzer_1
+            frequency: 1000Hz
+        - output.set_level:
+            id: buzzer_1
+            level: 50%
+        - delay: 0.1s
+        - output.turn_off: buzzer_1
+        - delay: 0.1s
+        - output.esp8266_pwm.set_frequency:
+            id: buzzer_1
+            frequency: 1500Hz
+        - output.set_level:
+            id: buzzer_1
+            level: 50%
+        - delay: 0.1s
+        - output.turn_off: buzzer_1
+        - light.dim_relative:
+            id: light_1
+            relative_brightness: 10%
+            transition_length: 1s
+  # Single short press + single long press: Brightness -        
+    - timing:
+        - ON for at most 0.6s
+        - OFF for at most 0.4s
+        - ON for at least 0.6s
+        - OFF for at least 0.2s
+      then:
+        - output.esp8266_pwm.set_frequency:
+            id: buzzer_1
+            frequency: 1500Hz
+        - output.set_level:
+            id: buzzer_1
+            level: 50%
+        - delay: 0.1s
+        - output.turn_off: buzzer_1
+        - delay: 0.1s
+        - output.esp8266_pwm.set_frequency:
+            id: buzzer_1
+            frequency: 1000Hz
+        - output.set_level:
+            id: buzzer_1
+            level: 50%
+        - delay: 0.1s
+        - output.turn_off: buzzer_1
+        - light.dim_relative:
+            id: light_1
+            relative_brightness: -10%
+            transition_length: 1s
+    
+        
+# Addressable LED strip (WS2812B)
+light:
+  - platform: fastled_clockless
+    chipset: WS2812B
+    pin: D2
+    num_leds: 24
+    rgb_order: GRB
+    name: "Lamp"
+    id: "light_1"
+    power_supply: 'power_supply_1'
+    effects:
+      # Use default parameters:
+      - random:
+      # Customize parameters
+      - random:
+          name: "Slow Random Effect"
+          transition_length: 30s
+          update_interval: 30s
+      - random:
+          name: "Fast Random Effect"
+          transition_length: 4s
+          update_interval: 5s
+      - strobe:
+      - strobe:
+          name: Strobe Effect With Custom Values
+          colors:
+            - state: True
+              brightness: 100%
+              red: 100%
+              green: 90%
+              blue: 0%
+              duration: 500ms
+            - state: False
+              duration: 250ms
+            - state: True
+              brightness: 100%
+              red: 0%
+              green: 100%
+              blue: 0%
+              duration: 500ms
+      - flicker:
+      - flicker:
+          name: Flicker Effect With Custom Values
+          alpha: 95%
+          intensity: 1.5%
+      - addressable_rainbow:
+      - addressable_rainbow:
+          name: Rainbow Effect With Custom Values
+          speed: 10
+          width: 50
+      - addressable_color_wipe:
+      - addressable_color_wipe:
+          name: Color Wipe Effect With Custom Values
+          colors:
+            - red: 100%
+              green: 100%
+              blue: 100%
+              num_leds: 1
+            - red: 0%
+              green: 0%
+              blue: 0%
+              num_leds: 1
+          add_led_interval: 100ms
+          reverse: False
+      - addressable_scan:
+      - addressable_scan:
+          name: Scan Effect With Custom Values
+          move_interval: 100ms
+      - addressable_twinkle:
+      - addressable_twinkle:
+          name: Twinkle Effect With Custom Values
+          twinkle_probability: 5%
+          progress_interval: 4ms
+      - addressable_random_twinkle:
+      - addressable_random_twinkle:
+          name: Random Twinkle Effect With Custom Values
+          twinkle_probability: 5%
+          progress_interval: 32ms
+      - addressable_fireworks:
+      - addressable_fireworks:
+          name: Fireworks Effect With Custom Values
+          update_interval: 32ms
+          spark_probability: 10%
+          use_random_color: false
+          fade_out_rate: 120
+      - addressable_flicker:
+      - addressable_flicker:
+          name: Addressable Flicker Effect With Custom Values
+          update_interval: 16ms
+          intensity: 5%
+      - addressable_lambda:
+          name: "Fire"
+          update_interval: 15ms
+          lambda: |-
+            int Cooling = 55;
+            int Sparking = 110;
+            static byte heat[24];
+            int cooldown;
+            
+            // Step 1.  Cool down every cell a little
+            for( int i = 0; i < it.size(); i++) {
+              cooldown = random(0, ((Cooling * 10) / it.size()) + 2);
+              
+              if(cooldown>heat[i]) {
+                heat[i]=0;
+              } else {
+                heat[i]=heat[i]-cooldown;
+              }
+            }
+            
+            // Step 2.  Heat from each cell drifts 'up' and diffuses a little
+            for( int k= it.size() - 1; k >= 2; k--) {
+              heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2]) / 3;
+            }
+            
+            // Step 3.  Randomly ignite new 'sparks' near the bottom
+            if( random(255) < Sparking ) {
+              int y = random(7);
+              heat[y] = heat[y] + random(160,255);
+            }
+            
+            // Step 4.  Convert heat to LED colors
+            for( int Pixel = 0; Pixel < it.size(); Pixel++) {
+              // Scale 'heat' down from 0-255 to 0-191
+              byte t192 = round((heat[Pixel]/255.0)*191);
+             
+              // calculate ramp up from
+              byte heatramp = t192 & 0x3F; // 0..63
+              heatramp <<= 2; // scale up to 0..252
+             
+              // figure out which third of the spectrum we're in:
+              //this is where you can reverse the effect by switching the commented out lines in all 3 places.
+              if( t192 > 0x80) {                     // hottest
+                //it[it.size() - Pixel - 1] = ESPColor(255, 255, heatramp);
+                it[Pixel] = ESPColor(255, 255, heatramp);
+              } else if( t192 > 0x40 ) {             // middle
+                //it[it.size() - Pixel - 1] = ESPColor(255, heatramp, 0);
+                it[Pixel] = ESPColor(255, heatramp, 0);
+              } else {                               // coolest
+                //it[it.size() - Pixel - 1] = ESPColor(heatramp, 0, 0);
+                it[Pixel] = ESPColor(heatramp, 0, 0);
+              }
+            }
