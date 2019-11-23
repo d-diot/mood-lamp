@@ -11,6 +11,11 @@ esphome:
 wifi:
   ssid: "d-diot"
   password: "d-diot.com"
+  # Optional manual IP
+#  manual_ip:
+#    static_ip: 192.168.10.101
+#    gateway: 192.168.10.1
+#    subnet: 255.255.255.0
 
 # Enable logging
 logger:
@@ -20,11 +25,17 @@ api:
 
 ota:
 
+globals:
+  - id: fade_up
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+ 
 
 sensor:
 # Wifi signal monitor
   - platform: wifi_signal
-    name: "WiFi Signal Sensor"
+    name: "WiFi Signal"
     update_interval: 60s
 # Microphone (Analog output)
 #  - platform: adc
@@ -72,76 +83,96 @@ binary_sensor:
     pin: D5
     name: "Button"
     id: "button_1"
+    internal: true
     on_press:
-      - output.esp8266_pwm.set_frequency:
-            id: buzzer_1
-            frequency: 1000Hz
-      - output.set_level:
-            id: buzzer_1
-            level: 50%
+      then:
+        - if:
+            condition:
+              and:
+                - light.is_on: "light_1"
+                - lambda: |-
+                    if(id(light_1).current_values.get_brightness() == 1.0) {
+                      return true;
+                    }
+                    else {
+                      return false;
+                    }
+            then:
+              - lambda: |-
+                  id(fade_up) = false;
+        - if:
+            condition:
+              and:
+                - light.is_on: "light_1"
+                - lambda: |-
+                    if(id(light_1).current_values.get_brightness() <= 0.15) {
+                      return true;
+                    }
+                    else {
+                      return false;
+                    }
+            then:
+              - lambda: |-
+                  id(fade_up) = true;
+        - if:
+            condition: 
+              and:
+                - lambda: |-
+                    return id(fade_up);
+                - light.is_on: "light_1"
+            then:
+              - while:
+                  condition:
+                    binary_sensor.is_on: "button_1"
+                  then:
+                    - light.dim_relative:
+                        id: "light_1"
+                        relative_brightness: 3%
+                        transition_length: 0.1s
+                    - delay: 0.1s
+        - if:
+            condition: 
+              and:
+                - lambda: |-
+                    return !id(fade_up);
+                - light.is_on: "light_1"
+            then:
+              - while:
+                  condition:
+                    binary_sensor.is_on: "button_1"
+                  then:
+                    - light.dim_relative:
+                        id: "light_1"
+                        relative_brightness: -3%
+                        transition_length: 0.1s
+                    - delay: 0.1s
     on_release:
-      - output.turn_off: buzzer_1
-    on_multi_click:
-  # Single click - Toggle ON/OFF
-    - timing:
-        - ON for at most 0.6s
-        - OFF for at least 0.4s
       then:
-        - light.toggle: light_1
-  # Single long press: Brightness +  
-    - timing:
-        - ON for at least 0.6s
-        - OFF for at least 0.2s
-      then:
+        - lambda: |-
+            id(fade_up) = !id(fade_up);
+        - delay: 2s
+        - if:
+            condition:
+              binary_sensor.is_off: "button_1"
+            then:
+              - lambda: |-
+                  id(fade_up) = true;
+                  
+    on_click:
+      then: 
         - output.esp8266_pwm.set_frequency:
-            id: buzzer_1
-            frequency: 1000Hz
+              id: buzzer_1
+              frequency: 1000Hz
         - output.set_level:
-            id: buzzer_1
-            level: 50%
+              id: buzzer_1
+              level: 50%
+        - light.toggle: "light_1"
+        - lambda: |-
+            id(fade_up) = true;
         - delay: 0.1s
         - output.turn_off: buzzer_1
-        - delay: 0.1s
-        - output.esp8266_pwm.set_frequency:
-            id: buzzer_1
-            frequency: 1500Hz
-        - output.set_level:
-            id: buzzer_1
-            level: 50%
-        - delay: 0.1s
-        - output.turn_off: buzzer_1
-        - light.dim_relative:
-            id: light_1
-            relative_brightness: 10%
-            transition_length: 1s
-  # Single short press + single long press: Brightness -        
-    - timing:
-        - ON for at most 0.6s
-        - OFF for at most 0.4s
-        - ON for at least 0.6s
-        - OFF for at least 0.2s
-      then:
-        - output.esp8266_pwm.set_frequency:
-            id: buzzer_1
-            frequency: 1500Hz
-        - output.set_level:
-            id: buzzer_1
-            level: 50%
-        - delay: 0.1s
-        - output.turn_off: buzzer_1
-        - delay: 0.1s
-        - output.esp8266_pwm.set_frequency:
-            id: buzzer_1
-            frequency: 1000Hz
-        - output.set_level:
-            id: buzzer_1
-            level: 50%
-        - delay: 0.1s
-        - output.turn_off: buzzer_1
-        - light.dim_relative:
-            id: light_1
-            relative_brightness: -10%
-            transition_length: 1s
+        
+
     
         
 # Addressable LED strip (WS2812B)
